@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import '../models/product.dart';
@@ -27,27 +28,44 @@ class ApiService {
 
   Future<dynamic> _get(String path) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    final resp = await http.get(uri, headers: await _headers())
-        .timeout(const Duration(seconds: 15));
-    return _handle(resp);
+    try {
+      final resp = await http.get(uri, headers: await _headers())
+          .timeout(const Duration(seconds: 20));
+      return _handle(resp);
+    } on SocketException catch (e) {
+      throw ApiException('Cannot reach server. Check Wi-Fi/data. (${e.message})');
+    } on http.ClientException catch (e) {
+      throw ApiException('Connection error: ${e.message}');
+    }
   }
 
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    final resp = await http.post(uri,
-        headers: await _headers(), body: jsonEncode(body))
-        .timeout(const Duration(seconds: 20));
-    return _handle(resp);
+    try {
+      final resp = await http.post(uri,
+          headers: await _headers(), body: jsonEncode(body))
+          .timeout(const Duration(seconds: 25));
+      return _handle(resp);
+    } on SocketException catch (e) {
+      throw ApiException('Cannot reach server. Check Wi-Fi/data. (${e.message})');
+    } on http.ClientException catch (e) {
+      throw ApiException('Connection error: ${e.message}');
+    }
   }
 
   dynamic _handle(http.Response resp) {
     if (resp.statusCode == 401) {
-      throw ApiException('Session expired. Please log in again.',
+      throw ApiException('Invalid credentials',
           statusCode: 401);
     }
-    final body = jsonDecode(resp.body);
+    dynamic body;
+    try {
+      body = jsonDecode(resp.body);
+    } catch (_) {
+      body = {};
+    }
     if (resp.statusCode >= 200 && resp.statusCode < 300) return body;
-    final msg = body['error'] ?? body['message'] ?? 'Request failed';
+    final msg = body['error'] ?? body['message'] ?? 'Request failed (${resp.statusCode})';
     throw ApiException(msg.toString(), statusCode: resp.statusCode);
   }
 

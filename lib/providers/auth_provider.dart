@@ -43,16 +43,14 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException catch (e) {
-      if (e.statusCode == 401) {
-        _error = 'Invalid email or password';
-      } else {
-        _error = e.message;
-      }
+      _error = e.statusCode == 401
+          ? 'Invalid email or password'
+          : e.message;
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Network error. Check your connection.';
+      _error = e.toString();
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
